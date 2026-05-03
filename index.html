@@ -143,6 +143,10 @@
                 <button class="tool-btn" id="action-download" title="Save Image">
                     <i data-lucide="download"></i>
                 </button>
+                <button class="tool-btn" id="action-import" title="Import Media">
+                    <i data-lucide="image"></i>
+                </button>
+                <input type="file" id="media-upload" accept="image/*,video/*" hidden>
                 <!-- SHARE BUTTON -->
                 <button class="tool-btn" id="action-share" title="Share & Collaborate" style="color: var(--primary); background: rgba(99, 102, 241, 0.1);">
                     <i data-lucide="share-2"></i>
@@ -152,7 +156,9 @@
 
         <!-- Canvas Area -->
         <div id="canvas-wrapper">
-            <canvas id="drawing-canvas" class="canvas-card" data-pattern="ruled"></canvas>
+            <div id="canvas-container" style="position: relative;">
+                <canvas id="drawing-canvas" class="canvas-card" data-pattern="ruled"></canvas>
+            </div>
         </div>
         
         <!-- Page Navigation & Zoom Bar -->

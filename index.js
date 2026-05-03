@@ -121,6 +121,8 @@ function init() {
         loadData();
         renderNotebookList();
     }
+    
+    window.addEventListener('paste', handlePaste);
 }
 
 function broadcastAction(action, excludeConn = null) {
@@ -320,7 +322,7 @@ function joinViaCode(code) {
     const sharedNb = {
         id: 'nb_shared',
         title: 'Shared Sketchbook',
-        pages: [{ id: 'pg_shared', imageData: null, pattern: 'none' }]
+        pages: [{ id: 'pg_shared', imageData: null, pattern: 'none', media: [] }]
     };
     
     if (state.notebooks.length === 0) {
@@ -668,6 +670,176 @@ function createTextInput(x, y) {
 }
 
 /**
+ * Media Import & Paste Logic
+ */
+let mediaElements = [];
+
+function handlePaste(e) {
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image/') !== -1 || items[i].type.indexOf('video/') !== -1) {
+            const file = items[i].getAsFile();
+            importMedia(file);
+            break;
+        }
+    }
+}
+
+function importMedia(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const isVideo = file.type.startsWith('video/');
+        const newMedia = {
+            id: 'media_' + Date.now(),
+            type: isVideo ? 'video' : 'image',
+            src: e.target.result,
+            x: 50,
+            y: 50,
+            width: 250,
+            height: isVideo ? 180 : 250
+        };
+        
+        const nb = getCurrentNotebook();
+        if (nb) {
+            const page = nb.pages.find(p => p.id === state.activePageId);
+            if (page) {
+                if(!page.media) page.media = [];
+                page.media.push(newMedia);
+                saveData();
+                addMediaElement(newMedia);
+                showToast("Media Imported");
+            }
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+function addMediaElement(mediaData) {
+    const container = document.createElement('div');
+    container.className = `media-container ${mediaData.type === 'video' ? 'video-media' : ''}`;
+    container.id = mediaData.id;
+    container.style.left = mediaData.x + 'px';
+    container.style.top = mediaData.y + 'px';
+    container.style.width = mediaData.width + 'px';
+    container.style.height = mediaData.height + 'px';
+    
+    let contentEl;
+    if (mediaData.type === 'video') {
+        contentEl = document.createElement('video');
+        contentEl.controls = true;
+    } else {
+        contentEl = document.createElement('img');
+    }
+    contentEl.className = 'media-content';
+    contentEl.src = mediaData.src;
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'media-delete-btn';
+    deleteBtn.innerHTML = '<i data-lucide="x" size="14"></i>';
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        container.remove();
+        mediaElements = mediaElements.filter(m => m !== container);
+        const nb = getCurrentNotebook();
+        if (nb) {
+            const page = nb.pages.find(p => p.id === state.activePageId);
+            if (page) {
+                page.media = page.media.filter(m => m.id !== mediaData.id);
+                saveData();
+            }
+        }
+    };
+    
+    const resizeHandle = document.createElement('div');
+    resizeHandle.className = 'resize-handle';
+    
+    container.appendChild(contentEl);
+    container.appendChild(deleteBtn);
+    container.appendChild(resizeHandle);
+    document.getElementById('canvas-container').appendChild(container);
+    
+    mediaElements.push(container);
+    lucide.createIcons();
+    
+    setupMediaInteractions(container, mediaData, resizeHandle);
+}
+
+function setupMediaInteractions(container, mediaData, resizeHandle) {
+    let isDragging = false;
+    let isResizing = false;
+    let startX, startY, startLeft, startTop, startWidth, startHeight;
+    
+    container.addEventListener('pointerdown', (e) => {
+        if (e.target === resizeHandle) {
+            isResizing = true;
+        } else if (e.target.tagName !== 'BUTTON' && !e.target.closest('.media-delete-btn') && e.target.tagName !== 'VIDEO') {
+            isDragging = true;
+        } else if (e.target.tagName === 'VIDEO') {
+            const rect = container.getBoundingClientRect();
+            if (e.clientY - rect.top < rect.height - 40) {
+                isDragging = true;
+            } else {
+                return;
+            }
+        } else {
+            return;
+        }
+        
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = parseInt(container.style.left, 10);
+        startTop = parseInt(container.style.top, 10);
+        startWidth = parseInt(container.style.width, 10);
+        startHeight = parseInt(container.style.height, 10);
+        
+        container.setPointerCapture(e.pointerId);
+        e.stopPropagation();
+    });
+    
+    container.addEventListener('pointermove', (e) => {
+        if (!isDragging && !isResizing) return;
+        
+        const scaleX = 1 / state.scale;
+        
+        const dx = (e.clientX - startX) * scaleX;
+        const dy = (e.clientY - startY) * scaleX; 
+        
+        if (isDragging) {
+            mediaData.x = startLeft + dx;
+            mediaData.y = startTop + dy;
+            container.style.left = mediaData.x + 'px';
+            container.style.top = mediaData.y + 'px';
+        } else if (isResizing) {
+            mediaData.width = Math.max(50, startWidth + dx);
+            mediaData.height = Math.max(50, startHeight + dy);
+            container.style.width = mediaData.width + 'px';
+            container.style.height = mediaData.height + 'px';
+        }
+    });
+    
+    container.addEventListener('pointerup', (e) => {
+        if (!isDragging && !isResizing) return;
+        isDragging = false;
+        isResizing = false;
+        container.releasePointerCapture(e.pointerId);
+        saveData(); 
+    });
+}
+
+function clearMedia() {
+    mediaElements.forEach(el => el.remove());
+    mediaElements = [];
+}
+
+function renderMediaForPage(page) {
+    clearMedia();
+    if (page && page.media) {
+        page.media.forEach(m => addMediaElement(m));
+    }
+}
+
+/**
  * UI Logic & Themes
  */
 function setupToolbar() {
@@ -679,6 +851,18 @@ function setupToolbar() {
     document.getElementById('action-undo').addEventListener('click', undo);
     document.getElementById('action-download').addEventListener('click', downloadCanvas);
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+    
+    document.getElementById('action-import').addEventListener('click', () => {
+        document.getElementById('media-upload').click();
+    });
+    
+    document.getElementById('media-upload').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            importMedia(file);
+            e.target.value = '';
+        }
+    });
     
     patternSelect.addEventListener('change', (e) => {
         canvas.setAttribute('data-pattern', e.target.value);
@@ -805,6 +989,23 @@ function setZoom(scaleLevel) {
     state.scale = scaleLevel;
     canvas.style.width = `${CONFIG.canvasWidth * state.scale}px`;
     canvas.style.height = `${CONFIG.canvasHeight * state.scale}px`;
+    
+    mediaElements.forEach(container => {
+        const nb = getCurrentNotebook();
+        if (nb) {
+            const page = nb.pages.find(p => p.id === state.activePageId);
+            if (page && page.media) {
+                const mediaData = page.media.find(m => m.id === container.id);
+                if (mediaData) {
+                    container.style.left = `${mediaData.x * state.scale}px`;
+                    container.style.top = `${mediaData.y * state.scale}px`;
+                    container.style.width = `${mediaData.width * state.scale}px`;
+                    container.style.height = `${mediaData.height * state.scale}px`;
+                }
+            }
+        }
+    });
+
     zoomDisplay.innerText = `${Math.round(state.scale * 100)}%`;
 }
 
@@ -856,7 +1057,7 @@ function createNotebook() {
     const newNb = {
         id: 'nb_' + Date.now(),
         title: title,
-        pages: [{ id: 'pg_' + Date.now(), imageData: null, pattern: 'ruled' }]
+        pages: [{ id: 'pg_' + Date.now(), imageData: null, pattern: 'ruled', media: [] }]
     };
     
     state.notebooks.push(newNb);
@@ -885,7 +1086,8 @@ function addNewPage() {
     const newPage = {
         id: 'pg_' + Date.now(),
         imageData: null,
-        pattern: 'ruled'
+        pattern: 'ruled',
+        media: []
     };
     
     nb.pages.push(newPage);
@@ -937,6 +1139,8 @@ function loadPage(pageId) {
         img.onload = () => ctx.drawImage(img, 0, 0);
         img.src = page.imageData;
     }
+    
+    renderMediaForPage(page);
 
     pageIndicator.innerText = `${index + 1} / ${nb.pages.length}`;
     document.getElementById('prev-page').disabled = index === 0;
@@ -1013,7 +1217,7 @@ function createDefaultNotebook() {
     const defaultNb = {
         id: 'nb_default',
         title: 'My First Notebook',
-        pages: [{ id: 'pg_default', imageData: null, pattern: 'ruled' }]
+        pages: [{ id: 'pg_default', imageData: null, pattern: 'ruled', media: [] }]
     };
     state.notebooks = [defaultNb];
     state.activeNotebookId = defaultNb.id;

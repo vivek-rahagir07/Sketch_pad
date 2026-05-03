@@ -818,3 +818,69 @@ select option {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.7); }
+
+/* --- MEDIA ELEMENTS --- */
+.media-container {
+    position: absolute;
+    cursor: move;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    transition: border-color 0.2s;
+    z-index: 10;
+    user-select: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.media-container:hover {
+    border-color: var(--primary);
+}
+.media-container .media-content {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    object-fit: contain;
+    pointer-events: none; /* allows dragging the container */
+    display: block;
+}
+.media-container.video-media .media-content {
+    pointer-events: auto; /* allows video controls to work */
+}
+.media-delete-btn {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 11;
+    transition: transform 0.2s;
+}
+.media-container:hover .media-delete-btn {
+    display: flex;
+}
+.media-delete-btn:hover {
+    transform: scale(1.1);
+}
+.resize-handle {
+    position: absolute;
+    bottom: -6px;
+    right: -6px;
+    width: 16px;
+    height: 16px;
+    background: var(--primary);
+    border-radius: 50%;
+    cursor: nwse-resize;
+    display: none;
+    z-index: 12;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.media-container:hover .resize-handle {
+    display: block;
+}
