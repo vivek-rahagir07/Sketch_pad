@@ -426,6 +426,31 @@ function setupCanvasEvents() {
             createTextInput(pos.x, pos.y);
             return;
         }
+        
+        if (state.currentTool === 'sticky') {
+            const pos = getPos(e);
+            const newSticky = {
+                id: 'sticky_' + Date.now(),
+                type: 'sticky',
+                text: '',
+                x: pos.x,
+                y: pos.y,
+                width: 200,
+                height: 200
+            };
+            const nb = getCurrentNotebook();
+            if (nb) {
+                const page = nb.pages.find(p => p.id === state.activePageId);
+                if (page) {
+                    if(!page.media) page.media = [];
+                    page.media.push(newSticky);
+                    saveData();
+                    addStickyElement(newSticky);
+                }
+            }
+            setTool('pen'); 
+            return;
+        }
 
         state.isDrawing = true;
         saveStateToHistory(); 
@@ -837,21 +862,104 @@ function clearMedia() {
 function renderMediaForPage(page) {
     clearMedia();
     if (page && page.media) {
-        page.media.forEach(m => addMediaElement(m));
+        page.media.forEach(m => {
+            if (m.type === 'sticky') {
+                addStickyElement(m);
+            } else {
+                addMediaElement(m);
+            }
+        });
     }
+}
+
+function addStickyElement(stickyData) {
+    const container = document.createElement('div');
+    container.className = `sticky-note`;
+    container.id = stickyData.id;
+    container.style.left = stickyData.x + 'px';
+    container.style.top = stickyData.y + 'px';
+    
+    const dragHandle = document.createElement('div');
+    dragHandle.className = 'sticky-drag-handle';
+    
+    const textarea = document.createElement('textarea');
+    textarea.className = 'sticky-content';
+    textarea.value = stickyData.text || '';
+    textarea.placeholder = "Write a note...";
+    
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'media-delete-btn';
+    deleteBtn.innerHTML = '<i data-lucide="x" size="14"></i>';
+    deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        container.remove();
+        mediaElements = mediaElements.filter(m => m !== container);
+        const nb = getCurrentNotebook();
+        if (nb) {
+            const page = nb.pages.find(p => p.id === state.activePageId);
+            if (page && page.media) {
+                page.media = page.media.filter(m => m.id !== stickyData.id);
+                saveData();
+            }
+        }
+    };
+    
+    container.appendChild(dragHandle);
+    container.appendChild(textarea);
+    container.appendChild(deleteBtn);
+    document.getElementById('canvas-container').appendChild(container);
+    
+    mediaElements.push(container);
+    lucide.createIcons();
+    
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+    
+    dragHandle.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = parseInt(container.style.left, 10);
+        startTop = parseInt(container.style.top, 10);
+        dragHandle.setPointerCapture(e.pointerId);
+        e.stopPropagation();
+    });
+    
+    dragHandle.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const scaleX = 1 / state.scale;
+        const dx = (e.clientX - startX) * scaleX;
+        const dy = (e.clientY - startY) * scaleX; 
+        stickyData.x = startLeft + dx;
+        stickyData.y = startTop + dy;
+        container.style.left = stickyData.x + 'px';
+        container.style.top = stickyData.y + 'px';
+    });
+    
+    dragHandle.addEventListener('pointerup', (e) => {
+        isDragging = false;
+        dragHandle.releasePointerCapture(e.pointerId);
+        saveData(); 
+    });
+    
+    textarea.addEventListener('input', () => {
+        stickyData.text = textarea.value;
+        saveData();
+    });
 }
 
 /**
  * UI Logic & Themes
  */
 function setupToolbar() {
-    const tools = ['pen', 'pencil', 'highlighter', 'eraser', 'text', 'rect', 'circle', 'line'];
+    const tools = ['pen', 'pencil', 'highlighter', 'eraser', 'text', 'sticky', 'rect', 'circle', 'line'];
     tools.forEach(tool => {
         document.getElementById(`tool-${tool}`).addEventListener('click', () => setTool(tool));
     });
 
     document.getElementById('action-undo').addEventListener('click', undo);
     document.getElementById('action-download').addEventListener('click', downloadCanvas);
+    document.getElementById('action-pdf').addEventListener('click', exportToPDF);
     document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
     
     document.getElementById('action-import').addEventListener('click', () => {
@@ -1243,6 +1351,38 @@ function downloadCanvas() {
     showToast("Image Saved");
 }
 
+function exportToPDF() {
+    const nb = getCurrentNotebook();
+    if (!nb || nb.pages.length === 0) return;
+    
+    if (typeof window.jspdf === 'undefined') {
+        showToast("PDF library loading...");
+        return;
+    }
+    
+    showToast("Generating PDF...");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'px',
+        format: [CONFIG.canvasWidth, CONFIG.canvasHeight]
+    });
+    
+    nb.pages.forEach((page, index) => {
+        if (index > 0) pdf.addPage();
+        
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight, 'F');
+        
+        if (page.imageData) {
+            pdf.addImage(page.imageData, 'PNG', 0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight);
+        }
+    });
+    
+    pdf.save(`${nb.title}.pdf`);
+    showToast("PDF Exported!");
+}
+
 /* --- Event Listeners --- */
 document.getElementById('new-notebook-btn').addEventListener('click', createNotebook);
 document.getElementById('menu-toggle').addEventListener('click', () => {
@@ -1311,7 +1451,13 @@ function setupDictation() {
     };
     
     recognition.onerror = (event) => {
-        showToast("Microphone error: " + event.error);
+        if (event.error === 'not-allowed') {
+            showToast("Mic blocked. Run via localhost using 'npm run dev'.");
+        } else {
+            showToast("Microphone error: " + event.error);
+        }
+        isListening = false;
+        btn.classList.remove('listening');
     };
     
     recognition.onend = () => {
@@ -1321,7 +1467,7 @@ function setupDictation() {
 }
 
 /**
- * Chatbot Integration
+ * Chatbot Integration (Gemini Vision)
  */
 function setupChatbot() {
     const toggleBtn = document.getElementById('chatbot-toggle');
@@ -1331,10 +1477,30 @@ function setupChatbot() {
     const inputEl = document.getElementById('chat-input');
     const messagesEl = document.getElementById('chat-messages');
     
+    const settingsBtn = document.getElementById('settings-chat');
+    const apiKeyModal = document.getElementById('api-key-modal');
+    const apiKeyInput = document.getElementById('gemini-api-key');
+    const saveApiKeyBtn = document.getElementById('save-api-key');
+    
+    let geminiApiKey = localStorage.getItem('gemini_api_key') || '';
+    apiKeyInput.value = geminiApiKey;
+    
+    settingsBtn.onclick = () => {
+        apiKeyModal.style.display = apiKeyModal.style.display === 'none' ? 'flex' : 'none';
+    };
+    
+    saveApiKeyBtn.onclick = () => {
+        geminiApiKey = apiKeyInput.value.trim();
+        localStorage.setItem('gemini_api_key', geminiApiKey);
+        apiKeyModal.style.display = 'none';
+        showToast("API Key Saved");
+    };
+    
     toggleBtn.onclick = () => {
         windowEl.classList.toggle('open');
         if (windowEl.classList.contains('open')) {
             inputEl.focus();
+            if (!geminiApiKey) apiKeyModal.style.display = 'flex';
         }
     };
     
@@ -1350,35 +1516,62 @@ function setupChatbot() {
         messagesEl.scrollTop = messagesEl.scrollHeight;
     };
     
-    const handleSend = () => {
+    const handleSend = async () => {
         const text = inputEl.value.trim();
         if (!text) return;
         
         appendMessage(text, 'user');
         inputEl.value = '';
         
-        // simulate typing
         const typingDiv = document.createElement('div');
         typingDiv.className = 'chat-message bot typing-indicator';
-        typingDiv.innerHTML = `<div class="msg-content" style="opacity:0.5;">Typing...</div>`;
+        typingDiv.innerHTML = `<div class="msg-content" style="opacity:0.5;">Thinking...</div>`;
         messagesEl.appendChild(typingDiv);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         
-        setTimeout(() => {
-            typingDiv.remove();
-            let response = "I'm a simulated assistant! Try asking me 'how to draw' or 'help'.";
+        if (!geminiApiKey) {
+            setTimeout(() => {
+                typingDiv.remove();
+                appendMessage("Please set your Gemini API Key in the settings first to use the Vision AI bot.", 'bot');
+            }, 500);
+            return;
+        }
+        
+        try {
+            // Get current canvas image as base64
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            const base64Image = dataUrl.split(',')[1];
             
-            const lower = text.toLowerCase();
-            if (lower.includes('help') || lower.includes('how')) {
-                response = "You can use the tools on the left to draw. The microphone button lets you dictate text onto the canvas!";
-            } else if (lower.includes('clear')) {
-                response = "Click the red trash can icon in the bottom right corner to clear the current page.";
-            } else if (lower.includes('page')) {
-                response = "Use the plus button in the bottom navigation to add a new page, and the arrows to switch between them.";
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: "You are a helpful AI assistant in a sketchpad app. The user has provided an image of their current canvas. Please answer their query based on what they have drawn or written: " + text },
+                        { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+                    ]
+                }]
+            };
+
+            const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            const data = await res.json();
+            typingDiv.remove();
+            
+            if (data.error) {
+                appendMessage(`Error: ${data.error.message}`, 'bot');
+            } else if (data.candidates && data.candidates[0]) {
+                appendMessage(data.candidates[0].content.parts[0].text, 'bot');
+            } else {
+                appendMessage("I couldn't generate a response.", 'bot');
             }
             
-            appendMessage(response, 'bot');
-        }, 1200);
+        } catch (error) {
+            typingDiv.remove();
+            appendMessage("Failed to connect to Gemini API. Please check your network and API key.", 'bot');
+        }
     };
     
     sendBtn.onclick = handleSend;

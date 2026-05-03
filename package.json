@@ -1,0 +1,8 @@
+{
+  "name": "infinity-note",
+  "version": "1.0.0",
+  "description": "Professional Digital Sketchbook",
+  "scripts": {
+    "dev": "npx serve ."
+  }
+}

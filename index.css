@@ -1064,6 +1064,81 @@ select option {
     animation: pulse-mic 1.5s infinite;
 }
 
+/* --- STICKY NOTES --- */
+.sticky-note {
+    position: absolute;
+    width: 200px;
+    height: 200px;
+    background: #fef08a; /* default yellow */
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    border-radius: 4px;
+    border-bottom-right-radius: 20px; /* folded corner effect */
+    padding: 24px 16px 16px;
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Inter', sans-serif;
+    color: #333;
+}
+.sticky-note::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    background: rgba(0,0,0,0.05);
+    border-top-left-radius: 4px;
+}
+.sticky-content {
+    flex-grow: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    resize: none;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    color: inherit;
+}
+.sticky-drag-handle {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 20px;
+    background: rgba(0,0,0,0.05);
+    cursor: move;
+}
+
+/* --- API KEY MODAL --- */
+.api-key-modal {
+    position: absolute;
+    top: 60px;
+    left: 16px;
+    right: 16px;
+    background: var(--bg-color);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+}
+.api-key-modal label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-main);
+}
+.api-key-modal input {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    color: var(--text-main);
+    outline: none;
+}
+
 /* --- Mobile Fixes for New UI --- */
 @media (max-width: 768px) {
     .chatbot-widget {

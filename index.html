@@ -111,6 +111,9 @@
                 <button class="tool-btn" id="tool-text" title="Text (T)">
                     <i data-lucide="type"></i>
                 </button>
+                <button class="tool-btn" id="tool-sticky" title="Sticky Note (N)">
+                    <i data-lucide="sticky-note"></i>
+                </button>
             </div>
 
             <!-- Brush Size Slider -->
@@ -142,6 +145,9 @@
                 </button>
                 <button class="tool-btn" id="action-download" title="Save Image">
                     <i data-lucide="download"></i>
+                </button>
+                <button class="tool-btn" id="action-pdf" title="Export PDF">
+                    <i data-lucide="file-text"></i>
                 </button>
                 <button class="tool-btn" id="action-dictate" title="Dictate Text">
                     <i data-lucide="mic"></i>
@@ -268,13 +274,24 @@
         <div class="chatbot-header">
             <div class="chatbot-title">
                 <i data-lucide="bot" size="20"></i>
-                <span>Sketch Assistant</span>
+                <span>Gemini Assistant</span>
             </div>
-            <button class="close-chat" id="close-chat"><i data-lucide="x" size="18"></i></button>
+            <div style="display: flex; gap: 8px;">
+                <button class="close-chat" id="settings-chat" title="API Settings"><i data-lucide="settings" size="18"></i></button>
+                <button class="close-chat" id="close-chat"><i data-lucide="x" size="18"></i></button>
+            </div>
         </div>
+        
+        <div id="api-key-modal" class="api-key-modal" style="display: none;">
+            <label>Google Gemini API Key</label>
+            <input type="password" id="gemini-api-key" placeholder="Enter API Key">
+            <button id="save-api-key" class="icon-btn primary" style="width:100%; margin-top:10px;">Save Key</button>
+            <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">Required to use the Vision AI bot.</p>
+        </div>
+        
         <div class="chat-messages" id="chat-messages">
             <div class="chat-message bot">
-                <div class="msg-content">Hello! How can I help you with your sketchbook today?</div>
+                <div class="msg-content">Hello! I am your Gemini Vision assistant. I can see your sketchbook! How can I help you?</div>
             </div>
         </div>
         <div class="chat-input-area">
@@ -285,6 +302,7 @@
 </div>
 
 <!-- Scripts -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 <script src="index.js"></script>
