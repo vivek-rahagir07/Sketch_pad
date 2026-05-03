@@ -1064,3 +1064,25 @@ select option {
     animation: pulse-mic 1.5s infinite;
 }
 
+/* --- Mobile Fixes for New UI --- */
+@media (max-width: 768px) {
+    .chatbot-widget {
+        bottom: 80px; /* avoid overlap with page-nav-bar */
+        right: 16px;
+    }
+    .chatbot-window {
+        width: calc(100vw - 32px);
+        height: 60vh;
+        max-height: 450px;
+    }
+    .chat-input-area input {
+        font-size: 16px; /* prevent iOS auto-zoom */
+    }
+    .toolbar {
+        -ms-overflow-style: none; /* IE and Edge */
+        scrollbar-width: none; /* Firefox */
+    }
+    .toolbar::-webkit-scrollbar {
+        display: none; /* Chrome, Safari, Opera */
+    }
+}
