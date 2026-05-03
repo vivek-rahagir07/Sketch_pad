@@ -83,6 +83,8 @@ function init() {
     setupKeyboardShortcuts();
     setupTheme();
     setupShareModal();
+    setupDictation();
+    setupChatbot();
     
     setTool('pen');
     
@@ -1252,6 +1254,138 @@ document.getElementById('clear-all-data').addEventListener('click', () => {
         location.reload();
     }
 });
+
+/**
+ * Audio-to-Text Dictation
+ */
+function setupDictation() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const btn = document.getElementById('action-dictate');
+    
+    if (!SpeechRecognition) {
+        btn.onclick = () => showToast("Speech Recognition not supported in this browser.");
+        return;
+    }
+    
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    
+    let isListening = false;
+    
+    btn.onclick = () => {
+        if (isListening) {
+            recognition.stop();
+        } else {
+            recognition.start();
+        }
+    };
+    
+    recognition.onstart = () => {
+        isListening = true;
+        btn.classList.add('listening');
+        showToast("Listening...");
+    };
+    
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        
+        // Place text in center of screen
+        const rect = document.getElementById('canvas-container').getBoundingClientRect();
+        const scaleX = CONFIG.canvasWidth / rect.width;
+        
+        const centerX = (window.innerWidth / 2 - rect.left) * scaleX;
+        const centerY = (window.innerHeight / 2 - rect.top) * scaleX;
+        
+        setTool('text');
+        createTextInput(centerX, centerY);
+        
+        // Populate the input with the spoken text
+        const textInputs = document.querySelectorAll('.text-tool-input');
+        if (textInputs.length > 0) {
+            const input = textInputs[textInputs.length - 1];
+            input.value = transcript;
+            input.focus();
+        }
+    };
+    
+    recognition.onerror = (event) => {
+        showToast("Microphone error: " + event.error);
+    };
+    
+    recognition.onend = () => {
+        isListening = false;
+        btn.classList.remove('listening');
+    };
+}
+
+/**
+ * Chatbot Integration
+ */
+function setupChatbot() {
+    const toggleBtn = document.getElementById('chatbot-toggle');
+    const windowEl = document.getElementById('chatbot-window');
+    const closeBtn = document.getElementById('close-chat');
+    const sendBtn = document.getElementById('send-chat-btn');
+    const inputEl = document.getElementById('chat-input');
+    const messagesEl = document.getElementById('chat-messages');
+    
+    toggleBtn.onclick = () => {
+        windowEl.classList.toggle('open');
+        if (windowEl.classList.contains('open')) {
+            inputEl.focus();
+        }
+    };
+    
+    closeBtn.onclick = () => {
+        windowEl.classList.remove('open');
+    };
+    
+    const appendMessage = (text, sender) => {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-message ${sender}`;
+        msgDiv.innerHTML = `<div class="msg-content">${text}</div>`;
+        messagesEl.appendChild(msgDiv);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    };
+    
+    const handleSend = () => {
+        const text = inputEl.value.trim();
+        if (!text) return;
+        
+        appendMessage(text, 'user');
+        inputEl.value = '';
+        
+        // simulate typing
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'chat-message bot typing-indicator';
+        typingDiv.innerHTML = `<div class="msg-content" style="opacity:0.5;">Typing...</div>`;
+        messagesEl.appendChild(typingDiv);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        
+        setTimeout(() => {
+            typingDiv.remove();
+            let response = "I'm a simulated assistant! Try asking me 'how to draw' or 'help'.";
+            
+            const lower = text.toLowerCase();
+            if (lower.includes('help') || lower.includes('how')) {
+                response = "You can use the tools on the left to draw. The microphone button lets you dictate text onto the canvas!";
+            } else if (lower.includes('clear')) {
+                response = "Click the red trash can icon in the bottom right corner to clear the current page.";
+            } else if (lower.includes('page')) {
+                response = "Use the plus button in the bottom navigation to add a new page, and the arrows to switch between them.";
+            }
+            
+            appendMessage(response, 'bot');
+        }, 1200);
+    };
+    
+    sendBtn.onclick = handleSend;
+    inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleSend();
+    });
+}
 
 // Start
 init();

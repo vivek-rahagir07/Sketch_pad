@@ -143,6 +143,9 @@
                 <button class="tool-btn" id="action-download" title="Save Image">
                     <i data-lucide="download"></i>
                 </button>
+                <button class="tool-btn" id="action-dictate" title="Dictate Text">
+                    <i data-lucide="mic"></i>
+                </button>
                 <button class="tool-btn" id="action-import" title="Import Media">
                     <i data-lucide="image"></i>
                 </button>
@@ -252,6 +255,31 @@
                 <input type="text" id="share-link-input" class="copy-input" readonly value="">
                 <button id="copy-link-btn" class="copy-btn"><i data-lucide="copy" size="18"></i> Copy</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- CHATBOT WIDGET -->
+<div class="chatbot-widget" id="chatbot-widget">
+    <button class="chatbot-toggle" id="chatbot-toggle" title="Ask Assistant">
+        <i data-lucide="bot"></i>
+    </button>
+    <div class="chatbot-window" id="chatbot-window">
+        <div class="chatbot-header">
+            <div class="chatbot-title">
+                <i data-lucide="bot" size="20"></i>
+                <span>Sketch Assistant</span>
+            </div>
+            <button class="close-chat" id="close-chat"><i data-lucide="x" size="18"></i></button>
+        </div>
+        <div class="chat-messages" id="chat-messages">
+            <div class="chat-message bot">
+                <div class="msg-content">Hello! How can I help you with your sketchbook today?</div>
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Type your question...">
+            <button id="send-chat-btn"><i data-lucide="send" size="18"></i></button>
         </div>
     </div>
 </div>
