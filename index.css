@@ -693,6 +693,14 @@ select option {
     color: white;
     box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
+.social-icon-wrapper svg {
+    width: 28px;
+    height: 28px;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
 .social-btn:hover {
     transform: translateY(-5px);
 }

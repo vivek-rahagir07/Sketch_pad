@@ -46,6 +46,14 @@ const state = {
     isDarkMode: false
 };
 
+const collabState = {
+    peer: null,
+    connections: [],
+    isHost: false,
+    currentShareLink: '',
+    remotePeers: {} // track remote points
+};
+
 /**
  * DOM Elements
  */
@@ -86,29 +94,199 @@ function init() {
         document.getElementById('menu-toggle').style.display = 'block';
     }
 
-    // Handle incoming shared link
-    if (window.location.hash.startsWith('#data=')) {
-        handleSharedLink();
+    if (window.location.hash.startsWith('#collab=')) {
+        handleCollabLink();
     } else {
+        initHostPeer();
         loadData();
         renderNotebookList();
     }
 }
 
-function handleSharedLink() {
-    const dataStr = decodeURIComponent(window.location.hash.substring(6));
+function broadcastAction(action, excludeConn = null) {
+    if (collabState.peer && !collabState.peer.destroyed) {
+        collabState.connections.forEach(conn => {
+            if (conn.open && conn !== excludeConn) {
+                conn.send(action);
+            }
+        });
+    }
+}
+
+function applyRemoteAction(data) {
+    if (data.type === 'init') {
+        const img = new Image();
+        img.onload = () => ctx.drawImage(img, 0, 0);
+        img.src = data.data;
+        return;
+    }
+    if (data.type === 'clear') {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+    if (data.type === 'shape') {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = data.color;
+        ctx.lineWidth = parseInt(data.size, 10);
+        ctx.globalAlpha = 1;
+        
+        ctx.beginPath();
+        const w = data.end.x - data.start.x;
+        const h = data.end.y - data.start.y;
+
+        if (data.tool === 'rect') {
+            ctx.rect(data.start.x, data.start.y, w, h);
+        } else if (data.tool === 'circle') {
+            const radius = Math.sqrt(w*w + h*h);
+            ctx.arc(data.start.x, data.start.y, radius, 0, 2 * Math.PI);
+        } else if (data.tool === 'line') {
+            ctx.moveTo(data.start.x, data.start.y);
+            ctx.lineTo(data.end.x, data.end.y);
+        }
+        ctx.stroke();
+        return;
+    }
+    if (data.type === 'text') {
+        const drawSize = Math.max(16, data.size * 6);
+        ctx.font = `${drawSize}px Inter, sans-serif`; 
+        ctx.fillStyle = data.color;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+        
+        const lines = data.text.split('\n');
+        lines.forEach((line, i) => {
+            ctx.fillText(line, data.x, data.y + drawSize + (i * (drawSize + 5)));
+        });
+        return;
+    }
+    
+    // Stroke drawing
+    if (data.type === 'start') {
+        collabState.remotePeers[data.peerId] = { points: [data.pos] };
+    } else if (data.type === 'move') {
+        const remote = collabState.remotePeers[data.peerId];
+        if (!remote) return;
+        
+        let pressure = data.pressure || 0.5;
+        remote.points.push({ x: data.pos.x, y: data.pos.y, pressure: pressure });
+        
+        if (remote.points.length > 2) {
+            const lastPt = remote.points[remote.points.length - 1];
+            const prevPt = remote.points[remote.points.length - 2];
+            const prevPrevPt = remote.points[remote.points.length - 3];
+
+            const midPoint = {
+                x: (prevPrevPt.x + prevPt.x) / 2,
+                y: (prevPrevPt.y + prevPt.y) / 2
+            };
+            const endPoint = {
+                x: (prevPt.x + lastPt.x) / 2,
+                y: (prevPt.y + lastPt.y) / 2
+            };
+
+            // Setup style for remote
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.globalCompositeOperation = 'source-over';
+            const dynamicWidth = parseInt(data.size, 10) * (0.5 + pressure); 
+            
+            switch (data.tool) {
+                case 'pen':
+                    ctx.strokeStyle = data.color;
+                    ctx.lineWidth = dynamicWidth;
+                    ctx.globalAlpha = 1;
+                    break;
+                case 'pencil':
+                    ctx.strokeStyle = data.color;
+                    ctx.lineWidth = dynamicWidth * 0.8; 
+                    ctx.globalAlpha = 0.8;
+                    break;
+                case 'highlighter':
+                    ctx.globalCompositeOperation = 'multiply'; 
+                    ctx.strokeStyle = data.color;
+                    ctx.lineWidth = parseInt(data.size, 10) * 6; 
+                    ctx.globalAlpha = 0.4;
+                    ctx.lineCap = 'square';
+                    break;
+                case 'eraser':
+                    ctx.globalCompositeOperation = 'destination-out';
+                    ctx.lineWidth = parseInt(data.size, 10) * 5;
+                    ctx.globalAlpha = 1;
+                    break;
+            }
+
+            if (data.tool === 'eraser') {
+                 ctx.lineTo(data.pos.x, data.pos.y);
+                 ctx.stroke();
+            } else {
+                ctx.beginPath();
+                ctx.moveTo(midPoint.x, midPoint.y);
+                ctx.quadraticCurveTo(prevPt.x, prevPt.y, endPoint.x, endPoint.y);
+                ctx.stroke();
+            }
+        }
+    } else if (data.type === 'end') {
+        delete collabState.remotePeers[data.peerId];
+    }
+}
+
+function initHostPeer() {
+    collabState.isHost = true;
+    collabState.peer = new Peer();
+    
+    collabState.peer.on('open', (id) => {
+        collabState.currentShareLink = window.location.href.split('#')[0] + '#collab=' + id;
+    });
+
+    collabState.peer.on('connection', (conn) => {
+        collabState.connections.push(conn);
+        conn.on('open', () => {
+            conn.send({ type: 'init', data: canvas.toDataURL() });
+            showToast('Guest joined!');
+        });
+        conn.on('data', (data) => {
+            applyRemoteAction(data);
+            broadcastAction(data, conn);
+        });
+        conn.on('close', () => {
+            collabState.connections = collabState.connections.filter(c => c !== conn);
+        });
+    });
+}
+
+function handleCollabLink() {
+    const hostId = decodeURIComponent(window.location.hash.substring(8));
+    collabState.isHost = false;
+    collabState.peer = new Peer();
+    
+    collabState.peer.on('open', (id) => {
+        const conn = collabState.peer.connect(hostId);
+        collabState.connections.push(conn);
+        
+        conn.on('open', () => {
+            showToast('Connected to Host!');
+        });
+        conn.on('data', (data) => {
+            applyRemoteAction(data);
+        });
+        conn.on('close', () => {
+            showToast('Host disconnected.');
+        });
+    });
+    
     const sharedNb = {
         id: 'nb_shared',
         title: 'Shared Sketchbook',
-        pages: [{ id: 'pg_shared', imageData: dataStr, pattern: 'none' }]
+        pages: [{ id: 'pg_shared', imageData: null, pattern: 'none' }]
     };
-    state.notebooks = [sharedNb]; // Temp state
+    state.notebooks = [sharedNb]; 
     state.activeNotebookId = sharedNb.id;
     state.activePageId = sharedNb.pages[0].id;
     
     renderNotebookList();
     loadPage(sharedNb.pages[0].id);
-    showToast("Loaded Shared Sketch!");
 }
 
 /**
@@ -124,20 +302,7 @@ function setupShareModal() {
     let currentShareLink = '';
 
     shareBtn.addEventListener('click', () => {
-        // Generate a compressed collaboration link using URL fragments
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = canvas.height;
-        const tCtx = tempCanvas.getContext('2d');
-        tCtx.fillStyle = '#ffffff';
-        tCtx.fillRect(0,0, tempCanvas.width, tempCanvas.height);
-        tCtx.drawImage(canvas, 0, 0);
-        
-        // High compression JPEG to fit in URL
-        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.25);
-        currentShareLink = window.location.href.split('#')[0] + '#data=' + encodeURIComponent(dataUrl);
-        linkInput.value = currentShareLink;
-
+        linkInput.value = collabState.currentShareLink;
         modal.classList.add('active');
     });
 
@@ -172,14 +337,14 @@ function setupShareModal() {
     document.querySelectorAll('.social-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const platform = e.currentTarget.classList[1]; // e.g., 'whatsapp'
-            const text = encodeURIComponent("Join my collaborative sketchbook on Infinity Note! " + currentShareLink);
+            const text = encodeURIComponent("Join my collaborative sketchbook on Infinity Note! " + collabState.currentShareLink);
             let url = '';
 
             switch(platform) {
                 case 'whatsapp': url = `https://api.whatsapp.com/send?text=${text}`; break;
                 case 'twitter': url = `https://twitter.com/intent/tweet?text=${text}`; break;
-                case 'facebook': url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentShareLink)}`; break;
-                case 'linkedin': url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(currentShareLink)}`; break;
+                case 'facebook': url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(collabState.currentShareLink)}`; break;
+                case 'linkedin': url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(collabState.currentShareLink)}`; break;
             }
 
             if(url) {
@@ -219,6 +384,8 @@ function setupCanvasEvents() {
         
         if (['rect', 'circle', 'line'].includes(state.currentTool)) {
             state.snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        } else {
+            broadcastAction({ type: 'start', peerId: collabState.peer.id, tool: state.currentTool, color: state.currentColor, size: brushSizeInput.value, pos: pos });
         }
     };
 
@@ -267,6 +434,8 @@ function setupCanvasEvents() {
                     ctx.quadraticCurveTo(prevPt.x, prevPt.y, endPoint.x, endPoint.y);
                     ctx.stroke();
                 }
+                
+                broadcastAction({ type: 'move', peerId: collabState.peer.id, tool: state.currentTool, color: state.currentColor, size: brushSizeInput.value, pos: pos, pressure: pressure });
             }
         }
     };
@@ -282,8 +451,10 @@ function setupCanvasEvents() {
             ctx.putImageData(state.snapshot, 0, 0); 
             setupShapeStyle(); 
             drawShapePreview(pos);
+            broadcastAction({ type: 'shape', tool: state.currentTool, color: state.currentColor, size: brushSizeInput.value, start: {x: state.startX, y: state.startY}, end: pos });
         } else {
             ctx.closePath();
+            broadcastAction({ type: 'end', peerId: collabState.peer.id });
         }
         
         saveToCurrentPage();
@@ -430,6 +601,7 @@ function createTextInput(x, y) {
                 ctx.fillText(line, x, y + drawSize + (i * (drawSize + 5)));
             });
             saveToCurrentPage();
+            broadcastAction({ type: 'text', text: input.value, x: x, y: y, color: state.currentColor, size: baseSize });
         }
         if(document.body.contains(input)) document.body.removeChild(input);
     };
@@ -677,6 +849,7 @@ function clearPage() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         saveToCurrentPage();
         showToast("Page Cleared");
+        broadcastAction({ type: 'clear' });
     }
 }
 
