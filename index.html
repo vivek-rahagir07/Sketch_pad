@@ -12,6 +12,11 @@
     
     <!-- External CSS -->
     <link rel="stylesheet" href="index.css">
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
 
@@ -58,6 +63,14 @@
         <ul class="notebook-list" id="notebook-list">
             <!-- Notebooks injected here -->
         </ul>
+        
+        <div class="section-header" style="margin-top: 15px;">
+            <label>COLLABORATION</label>
+        </div>
+        <div style="padding: 0 15px; margin-bottom: 10px; display: flex; gap: 8px;">
+            <input type="text" id="join-code-input" placeholder="6-Digit Code" maxlength="6" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-body); color: var(--text-main); font-family: 'Outfit'; font-size: 0.9rem; text-align: center; letter-spacing: 2px;">
+            <button id="join-session-btn" class="icon-btn primary" title="Join" style="width: auto; padding: 0 12px; font-size: 0.85rem; font-weight: 500;">Join</button>
+        </div>
         
         <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;">
              <!-- Dark Mode Toggle -->
@@ -220,8 +233,15 @@
             </button>
         </div>
 
+        <div class="copy-link-section" style="margin-bottom: 15px;">
+            <label class="copy-label">6-Digit Session Code</label>
+            <div class="copy-input-group">
+                <input type="text" id="share-code-input" class="copy-input" readonly value="" style="font-size: 1.5rem; font-weight: 600; letter-spacing: 4px; text-align: center; color: var(--primary);">
+            </div>
+        </div>
+
         <div class="copy-link-section">
-            <label class="copy-label">Collab Link</label>
+            <label class="copy-label">Or Share Link</label>
             <div class="copy-input-group">
                 <input type="text" id="share-link-input" class="copy-input" readonly value="">
                 <button id="copy-link-btn" class="copy-btn"><i data-lucide="copy" size="18"></i> Copy</button>

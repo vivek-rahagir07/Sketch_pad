@@ -43,7 +43,8 @@ const state = {
     history: [],
     historyStep: -1,
     scale: 1.0,
-    isDarkMode: false
+    isDarkMode: false,
+    isCollaborating: false
 };
 
 const collabState = {
@@ -51,6 +52,7 @@ const collabState = {
     connections: [],
     isHost: false,
     currentShareLink: '',
+    joinCode: '',
     remotePeers: {} // track remote points
 };
 
@@ -93,6 +95,24 @@ function init() {
     if (window.innerWidth <= 768) {
         document.getElementById('menu-toggle').style.display = 'block';
     }
+
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').catch(err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+    }
+
+    document.getElementById('join-session-btn').addEventListener('click', () => {
+        const code = document.getElementById('join-code-input').value.trim();
+        if (code.length === 6) {
+            joinViaCode(code);
+        } else {
+            showToast("Enter a valid 6-digit code");
+        }
+    });
 
     if (window.location.hash.startsWith('#collab=')) {
         handleCollabLink();
@@ -234,10 +254,12 @@ function applyRemoteAction(data) {
 
 function initHostPeer() {
     collabState.isHost = true;
-    const myId = 'collab-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36);
+    const sixDigitCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const myId = 'collab-' + sixDigitCode;
+    collabState.joinCode = sixDigitCode;
     collabState.peer = new Peer(myId);
     
-    collabState.currentShareLink = window.location.href.split('#')[0] + '#collab=' + myId;
+    collabState.currentShareLink = window.location.href.split('#')[0] + '#collab=' + sixDigitCode;
     
     collabState.peer.on('open', (id) => {
         // Link is already prepared synchronously
@@ -260,10 +282,21 @@ function initHostPeer() {
 }
 
 function handleCollabLink() {
-    const hostId = decodeURIComponent(window.location.hash.substring(8));
+    const code = decodeURIComponent(window.location.hash.substring(8));
+    joinViaCode(code);
+}
+
+function joinViaCode(code) {
+    if (!code) return;
+    const hostId = code.startsWith('collab-') ? code : 'collab-' + code;
+    
+    state.isCollaborating = true;
     collabState.isHost = false;
+    collabState.joinCode = code.replace('collab-', '');
+    if (collabState.peer) collabState.peer.destroy();
+    
     collabState.peer = new Peer();
-    collabState.currentShareLink = window.location.href;
+    collabState.currentShareLink = window.location.href.split('#')[0] + '#collab=' + collabState.joinCode;
     
     collabState.peer.on('open', (id) => {
         const conn = collabState.peer.connect(hostId);
@@ -271,12 +304,16 @@ function handleCollabLink() {
         
         conn.on('open', () => {
             showToast('Connected to Host!');
+            if(window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
         });
         conn.on('data', (data) => {
             applyRemoteAction(data);
         });
         conn.on('close', () => {
             showToast('Host disconnected.');
+        });
+        conn.on('error', () => {
+            showToast('Connection failed. Invalid code?');
         });
     });
     
@@ -285,7 +322,12 @@ function handleCollabLink() {
         title: 'Shared Sketchbook',
         pages: [{ id: 'pg_shared', imageData: null, pattern: 'none' }]
     };
-    state.notebooks = [sharedNb]; 
+    
+    if (state.notebooks.length === 0) {
+        loadData();
+    }
+    
+    state.notebooks = [sharedNb, ...state.notebooks.filter(n => n.id !== 'nb_shared')]; 
     state.activeNotebookId = sharedNb.id;
     state.activePageId = sharedNb.pages[0].id;
     
@@ -302,11 +344,13 @@ function setupShareModal() {
     const closeBtn = document.getElementById('close-share-modal');
     const copyBtn = document.getElementById('copy-link-btn');
     const linkInput = document.getElementById('share-link-input');
+    const codeInput = document.getElementById('share-code-input');
 
     let currentShareLink = '';
 
     shareBtn.addEventListener('click', () => {
         linkInput.value = collabState.currentShareLink;
+        if (codeInput) codeInput.value = collabState.joinCode;
         modal.classList.add('active');
     });
 
@@ -934,9 +978,17 @@ function undo() {
 }
 
 function saveData() {
+    if (state.isCollaborating && state.activeNotebookId === 'nb_shared') {
+        return; // Do not save the shared notebook to local storage
+    }
+    
+    const notebooksToSave = state.notebooks.filter(n => n.id !== 'nb_shared');
+    const activeIdToSave = state.activeNotebookId === 'nb_shared' ? 
+        (notebooksToSave.length > 0 ? notebooksToSave[0].id : null) : state.activeNotebookId;
+        
     localStorage.setItem('infinityNoteDataV2', JSON.stringify({
-        notebooks: state.notebooks,
-        activeNbId: state.activeNotebookId
+        notebooks: notebooksToSave,
+        activeNbId: activeIdToSave
     }));
 }
 
