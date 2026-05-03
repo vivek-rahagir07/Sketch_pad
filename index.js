@@ -263,6 +263,7 @@ function handleCollabLink() {
     const hostId = decodeURIComponent(window.location.hash.substring(8));
     collabState.isHost = false;
     collabState.peer = new Peer();
+    collabState.currentShareLink = window.location.href;
     
     collabState.peer.on('open', (id) => {
         const conn = collabState.peer.connect(hostId);
@@ -317,6 +318,10 @@ function setupShareModal() {
         if (e.target === modal) {
             modal.classList.remove('active');
         }
+    });
+
+    linkInput.addEventListener('click', () => {
+        linkInput.select();
     });
 
     copyBtn.addEventListener('click', async () => {
