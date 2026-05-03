@@ -234,10 +234,13 @@ function applyRemoteAction(data) {
 
 function initHostPeer() {
     collabState.isHost = true;
-    collabState.peer = new Peer();
+    const myId = 'collab-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now().toString(36);
+    collabState.peer = new Peer(myId);
+    
+    collabState.currentShareLink = window.location.href.split('#')[0] + '#collab=' + myId;
     
     collabState.peer.on('open', (id) => {
-        collabState.currentShareLink = window.location.href.split('#')[0] + '#collab=' + id;
+        // Link is already prepared synchronously
     });
 
     collabState.peer.on('connection', (conn) => {
