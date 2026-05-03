@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Infinity Note - Professional Digital Sketchbook</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- External CSS -->
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+<!-- SVG Gradient Definition -->
+<svg style="width:0;height:0;position:absolute;" aria-hidden="true" focusable="false">
+  <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+    <stop offset="0%" stop-color="var(--primary)" />
+    <stop offset="100%" stop-color="var(--secondary)" />
+  </linearGradient>
+</svg>
+
+<!-- FANCY PRELOADER -->
+<div id="preloader">
+    <div class="loader-content">
+        <!-- SVG Infinity Icon -->
+        <svg class="infinity-svg" viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+            <path class="infinity-path" d="M20,30 C20,10 40,10 50,30 C60,50 80,50 80,30 C80,10 60,10 50,30 C40,50 20,50 20,30 Z" />
+        </svg>
+        <div class="loader-text">InfinityNote</div>
+        <div class="loader-progress-track">
+            <div class="loader-progress-bar"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Brush Preview -->
+<div id="brush-cursor"></div>
+
+<div class="app-container">
+    <!-- Sidebar -->
+    <aside class="notebook-shelf" id="sidebar">
+        <div class="logo">
+            <i data-lucide="infinity" size="28"></i>
+            <span>InfinityNote</span>
+        </div>
+
+        <div class="section-header">
+            <label>MY NOTEBOOKS</label>
+            <button class="icon-btn primary" id="new-notebook-btn" title="New Notebook">
+                <i data-lucide="plus" size="14"></i>
+            </button>
+        </div>
+
+        <ul class="notebook-list" id="notebook-list">
+            <!-- Notebooks injected here -->
+        </ul>
+        
+        <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px;">
+             <!-- Dark Mode Toggle -->
+             <button id="theme-toggle" class="icon-btn" style="width: 100%; justify-content: flex-start; gap: 10px; border: none;">
+                <i data-lucide="moon"></i>
+                <span>Dark Mode</span>
+             </button>
+             
+             <button id="clear-all-data" style="width: 100%; padding: 10px; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: none; border-radius: 10px; cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+                <i data-lucide="trash" size="16"></i> Reset App
+             </button>
+        </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="workspace">
+        
+        <!-- Toggle Sidebar (Mobile) -->
+        <button id="menu-toggle" class="icon-btn" style="position: absolute; top: 20px; left: 20px; z-index: 60; background: var(--card-bg); display: none;">
+            <i data-lucide="menu"></i>
+        </button>
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <div class="tool-group">
+                <button class="tool-btn active" id="tool-pen" title="Fountain Pen (P)">
+                    <i data-lucide="pen-tool"></i>
+                </button>
+                <button class="tool-btn" id="tool-pencil" title="Pencil (B)">
+                    <i data-lucide="pencil"></i>
+                </button>
+                <button class="tool-btn" id="tool-highlighter" title="Highlighter (H)">
+                    <i data-lucide="highlighter"></i>
+                </button>
+                <button class="tool-btn" id="tool-eraser" title="Eraser (E)">
+                    <i data-lucide="eraser"></i>
+                </button>
+                <button class="tool-btn" id="tool-text" title="Text (T)">
+                    <i data-lucide="type"></i>
+                </button>
+            </div>
+
+            <!-- Brush Size Slider -->
+            <div class="tool-group" style="display: flex; align-items: center; gap: 8px; padding: 0 16px;">
+                <i data-lucide="circle" size="8" style="color: var(--text-muted)"></i>
+                <input type="range" id="brush-size" min="1" max="40" value="3" title="Brush Size ([ / ])">
+                <i data-lucide="circle" size="18" style="color: var(--text-muted)"></i>
+            </div>
+            
+            <div class="tool-group">
+                 <button class="tool-btn" id="tool-rect" title="Rectangle (S)">
+                    <i data-lucide="square"></i>
+                </button>
+                 <button class="tool-btn" id="tool-circle" title="Circle (C)">
+                    <i data-lucide="circle"></i>
+                </button>
+                 <button class="tool-btn" id="tool-line" title="Line (L)">
+                    <i data-lucide="minus"></i>
+                </button>
+            </div>
+
+            <div class="tool-group color-palette" id="color-palette">
+                <!-- Colors injected via JS -->
+            </div>
+
+            <div class="tool-group" style="border-right: none;">
+                <button class="tool-btn" id="action-undo" title="Undo (Ctrl+Z)">
+                    <i data-lucide="undo-2"></i>
+                </button>
+                <button class="tool-btn" id="action-download" title="Save Image">
+                    <i data-lucide="download"></i>
+                </button>
+                <!-- SHARE BUTTON -->
+                <button class="tool-btn" id="action-share" title="Share & Collaborate" style="color: var(--primary); background: rgba(99, 102, 241, 0.1);">
+                    <i data-lucide="share-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Area -->
+        <div id="canvas-wrapper">
+            <canvas id="drawing-canvas" class="canvas-card" data-pattern="ruled"></canvas>
+        </div>
+        
+        <!-- Page Navigation & Zoom Bar -->
+        <div class="page-nav-bar">
+             <button class="nav-btn" id="prev-page" title="Previous Page">
+                <i data-lucide="chevron-left"></i>
+             </button>
+             <span class="page-indicator" id="page-indicator">1 / 1</span>
+             <button class="nav-btn" id="next-page" title="Next Page">
+                <i data-lucide="chevron-right"></i>
+             </button>
+             <button class="nav-btn" id="add-page" title="Add Page" style="color: var(--primary);">
+                <i data-lucide="plus-square"></i>
+             </button>
+             
+             <div class="v-sep"></div>
+
+             <button class="nav-btn" id="zoom-out" title="Zoom Out">
+                <i data-lucide="minus-circle"></i>
+             </button>
+             <span class="page-indicator" id="zoom-level" style="min-width: 45px; font-size: 0.85rem;">100%</span>
+             <button class="nav-btn" id="zoom-in" title="Zoom In">
+                <i data-lucide="plus-circle"></i>
+             </button>
+             <button class="nav-btn" id="zoom-fit" title="Fit to Screen">
+                <i data-lucide="maximize"></i>
+             </button>
+
+             <div class="v-sep"></div>
+
+             <button class="nav-btn" id="clear-page" title="Clear Page" style="color: #ef4444;">
+                <i data-lucide="trash-2"></i>
+             </button>
+
+             <select id="pattern-select">
+                <option value="none">Blank</option>
+                <option value="ruled" selected>Ruled</option>
+                <option value="grid">Grid</option>
+                <option value="dots">Dots</option>
+            </select>
+        </div>
+
+        <!-- Toast Container -->
+        <div class="toast-container" id="toast-container"></div>
+    </main>
+</div>
+
+<!-- SHARE MODAL -->
+<div class="modal-overlay" id="share-modal-overlay">
+    <div class="share-modal">
+        <div class="modal-header">
+            <h2 class="modal-title">Share & Collaborate</h2>
+            <button class="close-modal" id="close-share-modal"><i data-lucide="x"></i></button>
+        </div>
+        
+        <div class="social-grid">
+            <button class="social-btn whatsapp">
+                <div class="social-icon-wrapper"><i data-lucide="message-circle"></i></div>
+                <span>WhatsApp</span>
+            </button>
+            <button class="social-btn twitter">
+                <div class="social-icon-wrapper"><i data-lucide="twitter"></i></div>
+                <span>X / Twitter</span>
+            </button>
+            <button class="social-btn facebook">
+                <div class="social-icon-wrapper"><i data-lucide="facebook"></i></div>
+                <span>Facebook</span>
+            </button>
+            <button class="social-btn linkedin">
+                <div class="social-icon-wrapper"><i data-lucide="linkedin"></i></div>
+                <span>LinkedIn</span>
+            </button>
+        </div>
+
+        <div class="copy-link-section">
+            <label class="copy-label">Collab Link (Mocked)</label>
+            <div class="copy-input-group">
+                <input type="text" id="share-link-input" class="copy-input" readonly value="">
+                <button id="copy-link-btn" class="copy-btn"><i data-lucide="copy" size="18"></i> Copy</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="index.js"></script>
+
+</body>
+</html>
